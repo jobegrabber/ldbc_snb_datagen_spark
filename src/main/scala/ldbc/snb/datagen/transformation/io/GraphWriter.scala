@@ -7,6 +7,7 @@ import shapeless.{Generic, Poly1}
 import better.files._
 import ldbc.snb.datagen.transformation.model.Mode.Raw
 import ldbc.snb.datagen.util.{Logging, SparkUI}
+import org.apache.hadoop.fs.Path
 
 import scala.collection.immutable.TreeMap
 
@@ -90,7 +91,8 @@ private final class DataFrameGraphWriter[M <: Mode](implicit
           log.info(s"$tpe: Writing started")
           Writer.apply(dataset.write, options)
             .mode(SaveMode.Ignore)
-            .save((path / options.format / PathComponent[GraphLike[M]].path(graph) / tpe.entityPath).toString())
+            //.save((path / options.format / PathComponent[GraphLike[M]].path(graph) / tpe.entityPath).toString())
+            .save(new Path(new Path(new Path(path, options.format), PathComponent[GraphLike[M]].path(graph)), tpe.entityPath).toString)
           log.info(s"$tpe: Writing completed")
         } (dataset.sparkSession)
     }

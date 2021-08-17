@@ -1,23 +1,25 @@
 package ldbc.snb.datagen.transformation.io
 
-import ldbc.snb.datagen.transformation.model.{Graph, GraphDef, GraphLike, Id, Mode}
-import org.apache.spark.sql.{DataFrame, SparkSession}
 import better.files._
 import ldbc.snb.datagen.syntax.fluentSyntaxOps
 import ldbc.snb.datagen.transformation.model.Mode.Raw
+import ldbc.snb.datagen.transformation.model._
 import ldbc.snb.datagen.util.Logging
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import java.net.URI
 
 trait GraphReader[M <: Mode] {
   type Data
+
   def read(graphDef: GraphDef[M], path: String, options: ReaderFormatOptions): Graph[M, Data]
+
   def exists(graphDef: GraphDef[M], path: String): Boolean
 }
 
 object GraphReader {
-  type Aux[M <: Mode, D] = GraphReader[M] { type Data = D }
+  type Aux[M <: Mode, D] = GraphReader[M] {type Data = D}
 
   def apply[M <: Mode, D](implicit ev: GraphReader.Aux[M, D]): GraphReader.Aux[M, D] = ev
 }
@@ -25,7 +27,7 @@ object GraphReader {
 class ReaderFormatOptions(val format: String, mode: Mode, private val customFormatOptions: Map[String, String] = Map.empty) {
   val defaultCsvFormatOptions = Map(
     "header" -> "true",
-    "sep" ->  "|"
+    "sep" -> "|"
   )
 
   val forcedRawCsvFormatOptions = Map(
@@ -52,11 +54,12 @@ private final class DataFrameGraphReader[M <: Mode](implicit spark: SparkSession
   type Data = DataFrame
 
   override def read(definition: GraphDef[M], path: String, options: ReaderFormatOptions): Graph[M, DataFrame] = {
-    val entities = for { (entity, schema) <- definition.entities } yield {
-      log.info(s"Reading $entity")
+    val entities = for {(entity, schema) <- definition.entities} yield {
+      log.info(s"Reading $entity from $path / ${options.format} / ${PathComponent[GraphLike[M]].path(definition)} / ${PathComponent[GraphLike[M]].path(definition)} with schema $schema")
+      log.info(s"Reading from ${new Path(new Path(new Path(path, options.format), PathComponent[GraphLike[M]].path(definition)), entity.entityPath).toString}")
       val df = Reader(options)
         .pipeFoldLeft(schema)(_.schema(_))
-        .load((path / options.format / PathComponent[GraphLike[M]].path(definition) / entity.entityPath).toString())
+        .load(new Path(new Path(new Path(path, options.format), PathComponent[GraphLike[M]].path(definition)), entity.entityPath).toString)
       entity -> ev(df)
     }
     Graph[M, DataFrame](definition.isAttrExploded, definition.isEdgesExploded, definition.mode, entities)
